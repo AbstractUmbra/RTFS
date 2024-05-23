@@ -1,0 +1,8 @@
+{
+    "files.watcherExclude": {
+        "repos/**": true
+    },
+    "search.exclude": {
+        "repos/**": true
+    }
+}

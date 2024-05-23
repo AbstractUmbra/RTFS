@@ -1,0 +1,12 @@
+services:
+  anilistcmp:
+    image: ghcr.io/abstractumbra/rtfs:latest
+    container_name: "rtfs"
+    restart: "unless-stopped"
+    networks:
+      main:
+
+networks:
+  main:
+    external:
+      true
