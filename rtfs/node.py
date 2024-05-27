@@ -15,6 +15,7 @@ from typing import Any, ClassVar
 from yarl import URL
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
 VERSION_REGEX = re.compile(r"__version__\s*=\s*(?:'|\")((?:\w|\.)*)(?:'|\")")
 
 
@@ -241,15 +242,15 @@ class Index:
                     )
 
         path = "/".join(dirs)
-        for node in nodes.values():
+        for node in inner_nodes.values():
             node.file = path
 
         nodes.update(inner_nodes)
 
     def index_directory(self, nodes: dict[str, Node], idx_path: pathlib.Path, parents: list[str], index_dir: str) -> None:
-        resolved_parents = (parents and parents.copy()) or []
-        target = idx_path.joinpath(*resolved_parents, index_dir)
-        resolved_parents.append(index_dir)
+        parents = (parents and parents.copy()) or []
+        target = idx_path.joinpath(*parents, index_dir)
+        parents.append(index_dir)
         idx = os.listdir(target)
 
         for file in idx:
@@ -258,9 +259,9 @@ class Index:
 
             new_path = target / file
             if new_path.exists() and new_path.is_dir():
-                self.index_directory(nodes, idx_path, resolved_parents, file)
+                self.index_directory(nodes, idx_path, parents, file)
             elif file.endswith(".py"):
-                self.index_file(nodes, new_path, [*resolved_parents, file], file in ("utils.py", "utilities.py"))
+                self.index_file(nodes, new_path, [*parents, file], file in ("utils.py", "utilities.py"))
 
     def index_lib(self) -> None:
         self.index_directory(self.nodes, self.repo_path, [], self.index_folder)
@@ -289,6 +290,7 @@ class Indexes:
         "wavelink": Index("repos/wavelink", index_folder="wavelink", repo_url="https://github.com/PythonistaGuild/Wavelink"),
         "aiohttp": Index("repos/aiohttp", index_folder="aiohttp", repo_url="https://github.com/aio-libs/aiohttp"),
         "hondana": Index("repos/hondana", index_folder="hondana", repo_url="https://github.com/AbstractUmbra/Hondana"),
+        "jishaku": Index("repos/jishaku", index_folder="jishaku", repo_url="https://github.com/Gorialis/Jishaku"),
     }
 
     def __init__(self) -> None:
@@ -304,7 +306,7 @@ class Indexes:
     def libraries(self) -> dict[str, str | None]:
         return {lib: index.version for lib, index in self.__indexable.items()}
 
-    def get_query(self, lib: str, query: str, as_text: bool = False) -> dict[str, Any] | None:
+    def get_query(self, lib: str, query: str) -> dict[str, Any] | None:
         if not self._is_indexed:
             # todo, lock?
             raise RuntimeError("Indexing is not complete.")
@@ -316,7 +318,7 @@ class Indexes:
         result = self.index[lib].find_matches(query)
         end = time.monotonic() - start
         return {
-            "nodes": {x.name: (x.url if not as_text else x.source) for x in result},
+            "nodes": {x.name: {"source": x.source, "url": x.url} for x in result},
             "query_time": end,
             "commit": self.index[lib].commit,
         }

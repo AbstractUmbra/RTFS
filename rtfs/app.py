@@ -31,7 +31,7 @@ async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[dict[str, A
             {"error": "The `format` parameter must be `url` or `source`."}, media_type=MediaType.JSON, status_code=400
         )
 
-    result = rtfs.get_query(library, query_search, format_ == "source")
+    result = rtfs.get_query(library, query_search)
     if result is None:
         return Response(
             content={
