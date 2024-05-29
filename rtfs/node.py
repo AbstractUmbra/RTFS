@@ -86,15 +86,14 @@ class Index:
 
         self.repo_url: URL = URL(repo_url)
         self.version: str | None = version
+        self.nodes: dict[str, Node] = {}
+        self.keys: list[str] = []
 
         if not self.repo_path.exists():
             self._clone_repo(self.repo_url, self.repo_path, branch)
 
         self.branch = self._process_git_dir()
         self.commit = self._process_current_commit()
-
-        self.nodes: dict[str, Node] = {}
-        self.keys: list[str] = []
 
     def _clone_repo(self, url: URL, path: pathlib.Path, branch_name: str | None) -> None:
         if not path.exists():
@@ -287,6 +286,7 @@ class Index:
 class Indexes:
     __indexable: ClassVar[dict[str, Index]] = {
         "discord.py": Index("repos/discord.py", index_folder="discord", repo_url="https://github.com/Rapptz/discord.py"),
+        "discord": Index("repos/discord.py", index_folder="discord", repo_url="https://github.com/Rapptz/discord.py"),
         "wavelink": Index("repos/wavelink", index_folder="wavelink", repo_url="https://github.com/PythonistaGuild/Wavelink"),
         "aiohttp": Index("repos/aiohttp", index_folder="aiohttp", repo_url="https://github.com/aio-libs/aiohttp"),
         "hondana": Index("repos/hondana", index_folder="hondana", repo_url="https://github.com/AbstractUmbra/Hondana"),

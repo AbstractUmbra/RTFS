@@ -1,2 +1,3 @@
 repos/
 test.py
+.env

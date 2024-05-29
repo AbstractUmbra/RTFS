@@ -3,6 +3,8 @@ services:
     image: ghcr.io/abstractumbra/rtfs:latest
     container_name: "rtfs"
     restart: "unless-stopped"
+    env_file:
+      - .env
     networks:
       main:
 

@@ -45,6 +45,8 @@ RUN curl -sSL https://install.python-poetry.org | python -
 WORKDIR /app
 COPY poetry.lock pyproject.toml ./
 
+ENV API_TOKEN=${API_TOKEN}
+
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
 RUN poetry install --only main
 

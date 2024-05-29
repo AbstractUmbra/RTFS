@@ -1,12 +1,18 @@
+import os
 from typing import Any
 
-from litestar import Litestar, MediaType, Response, get, status_codes
+from litestar import Litestar, MediaType, Request, Response, get, status_codes
 from litestar.datastructures import State
 from litestar.di import Provide
+from litestar.middleware.rate_limit import RateLimitConfig
 
 from .node import Indexes
 
 __all__ = ("APP",)
+
+OWNER_TOKEN = os.getenv("API_TOKEN")
+if not OWNER_TOKEN:
+    raise RuntimeError("Sorry, we required an `API_TOKEN` environment variable to be present.")
 
 
 def current_rtfs(state: State) -> Indexes:
@@ -48,4 +54,24 @@ def get_rtfs_indexes(app: Litestar) -> None:
     app.state.rtfs = Indexes()
 
 
-APP = Litestar(route_handlers=[get_rtfs], on_startup=[get_rtfs_indexes])
+def _bypass_for_owner(request: Request[Any, Any, Any]) -> bool:
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return True
+
+    if auth == OWNER_TOKEN:
+        return False
+
+    return True
+
+
+RL_CONFIG = RateLimitConfig(
+    ("minute", 10),
+    check_throttle_handler=_bypass_for_owner,
+    rate_limit_limit_header_key="X-Ratelimit-Limit",
+    rate_limit_policy_header_key="X-Ratelimit-Policy",
+    rate_limit_remaining_header_key="X-Ratelimit-Remaining",
+    rate_limit_reset_header_key="X-Ratelimit-Reset",
+)
+
+APP = Litestar(route_handlers=[get_rtfs], on_startup=[get_rtfs_indexes], middleware=[RL_CONFIG.middleware])
