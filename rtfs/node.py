@@ -323,6 +323,14 @@ class Indexes:
             "commit": self.index[lib].commit,
         }
 
+    def _do_pull(self, index: Index) -> bool:
+        try:
+            subprocess.run(["/bin/bash", "-c", f"cd {index.repo_path} && git pull"])
+        except:
+            return False
+
+        return True
+
     def _do_index(self) -> None:
         LOGGER.info("Starting indexing.")
 
@@ -337,3 +345,14 @@ class Indexes:
 
         LOGGER.info("Indexing complete!")
         self._is_indexed = True
+
+    def reload(self) -> bool:
+        self._is_indexed = False
+        success: list[str] = []
+        for name, value in self.__indexable.items():
+            if self._do_pull(value):
+                success.append(name)
+
+        self._do_index()
+
+        return len(success) == len(self.__indexable)

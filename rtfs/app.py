@@ -1,9 +1,14 @@
+import importlib
 import os
 from typing import Any
 
-from litestar import Litestar, MediaType, Request, Response, get, status_codes
+from litestar import Litestar, MediaType, Request, Response, get, post, status_codes
+from litestar.connection import ASGIConnection
 from litestar.datastructures import State
 from litestar.di import Provide
+from litestar.exceptions import NotAuthorizedException
+from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
+from litestar.middleware.base import DefineMiddleware
 from litestar.middleware.rate_limit import RateLimitConfig
 
 from .node import Indexes
@@ -13,6 +18,18 @@ __all__ = ("APP",)
 OWNER_TOKEN = os.getenv("API_TOKEN")
 if not OWNER_TOKEN:
     raise RuntimeError("Sorry, we required an `API_TOKEN` environment variable to be present.")
+
+
+class TokenAuthMiddleware(AbstractAuthenticationMiddleware):
+    async def authenticate_request(self, connection: ASGIConnection[Any, Any, Any, Any]) -> AuthenticationResult:
+        auth_header = connection.headers.get("Authorization")
+        if not auth_header or auth_header != OWNER_TOKEN:
+            raise NotAuthorizedException()
+
+        return AuthenticationResult(user="Owner", auth=auth_header)
+
+
+auth_middleware = DefineMiddleware(TokenAuthMiddleware)
 
 
 def current_rtfs(state: State) -> Indexes:
@@ -50,6 +67,22 @@ async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[dict[str, A
     return Response(content=result, media_type=MediaType.JSON, status_code=200)
 
 
+@post(path="/refresh", middleware=[auth_middleware], dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
+async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:
+    module = importlib.import_module("rtfs.node")
+    module = importlib.reload(module)
+
+    indexer = Indexes()
+    success = indexer.reload()
+    request.state.rtfs = indexer
+
+    return Response(
+        content={"success": success, "commits": {name: value.commit for name, value in indexer.index.items()}},
+        media_type=MediaType.JSON,
+        status_code=202,
+    )
+
+
 def get_rtfs_indexes(app: Litestar) -> None:
     app.state.rtfs = Indexes()
 
@@ -74,4 +107,4 @@ RL_CONFIG = RateLimitConfig(
     rate_limit_reset_header_key="X-Ratelimit-Reset",
 )
 
-APP = Litestar(route_handlers=[get_rtfs], on_startup=[get_rtfs_indexes], middleware=[RL_CONFIG.middleware])
+APP = Litestar(route_handlers=[get_rtfs, refresh_indexes], on_startup=[get_rtfs_indexes], middleware=[RL_CONFIG.middleware])
