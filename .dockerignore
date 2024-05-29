@@ -1,0 +1,11 @@
+repos/
+.git/
+.ruff_cache/
+.github/
+.vscode/
+.env.template
+README.md
+.gitignore
+docker-compose.yaml
+Dockerfile
+test.py
