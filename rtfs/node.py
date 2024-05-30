@@ -1,5 +1,4 @@
-__all__ = ("Node",)
-
+from __future__ import annotations
 
 import ast
 import configparser
@@ -10,13 +9,18 @@ import pathlib
 import re
 import subprocess
 import time
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from yarl import URL
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 VERSION_REGEX = re.compile(r"__version__\s*=\s*(?:'|\")((?:\w|\.)*)(?:'|\")")
+
+if TYPE_CHECKING:
+    from ._types.repo_config import RepoConfig
+
+__all__ = ("Node",)
 
 
 def _get_attr_name(attr: ast.Attribute) -> str | None:
@@ -69,9 +73,8 @@ class Index:
 
     def __init__(
         self,
-        repo_path: str,
-        /,
         *,
+        repo_path: str,
         index_folder: str,
         repo_url: str,
         branch: str | None = None,
@@ -284,18 +287,12 @@ class Index:
 
 
 class Indexes:
-    __indexable: ClassVar[dict[str, Index]] = {
-        "discord.py": Index("repos/discord.py", index_folder="discord", repo_url="https://github.com/Rapptz/discord.py"),
-        "discord": Index("repos/discord.py", index_folder="discord", repo_url="https://github.com/Rapptz/discord.py"),
-        "wavelink": Index("repos/wavelink", index_folder="wavelink", repo_url="https://github.com/PythonistaGuild/Wavelink"),
-        "aiohttp": Index("repos/aiohttp", index_folder="aiohttp", repo_url="https://github.com/aio-libs/aiohttp"),
-        "hondana": Index("repos/hondana", index_folder="hondana", repo_url="https://github.com/AbstractUmbra/Hondana"),
-        "jishaku": Index("repos/jishaku", index_folder="jishaku", repo_url="https://github.com/Gorialis/Jishaku"),
-    }
+    __indexable: dict[str, Index]
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict[str, RepoConfig], /) -> None:
         self.index: dict[str, Index] = {}
         self._is_indexed: bool = False
+        self._load_config(config)
         self._do_index()
 
     @property
@@ -305,6 +302,9 @@ class Indexes:
     @property
     def libraries(self) -> dict[str, str | None]:
         return {lib: index.version for lib, index in self.__indexable.items()}
+
+    def _load_config(self, config: dict[str, RepoConfig], /) -> None:
+        self.__indexable = {k: Index(**v) for k, v in config.items()}
 
     def get_query(self, lib: str, query: str) -> dict[str, Any] | None:
         if not self._is_indexed:

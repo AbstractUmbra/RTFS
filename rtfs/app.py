@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import importlib
+import json
 import os
-from typing import Any
+import pathlib
+from typing import TYPE_CHECKING, Any
 
 from litestar import Litestar, MediaType, Request, Response, get, post, status_codes
-from litestar.connection import ASGIConnection
-from litestar.datastructures import State
 from litestar.di import Provide
 from litestar.exceptions import NotAuthorizedException
 from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
@@ -13,11 +15,23 @@ from litestar.middleware.rate_limit import RateLimitConfig
 
 from .node import Indexes
 
+if TYPE_CHECKING:
+    from litestar.connection import ASGIConnection
+    from litestar.datastructures import State
+
+    from ._types.repo_config import RepoConfig
+
 __all__ = ("APP",)
 
 OWNER_TOKEN = os.getenv("API_TOKEN")
 if not OWNER_TOKEN:
     raise RuntimeError("Sorry, we required an `API_TOKEN` environment variable to be present.")
+
+REPO_PATH = pathlib.Path().parent / "repos.json"
+if not REPO_PATH.exists():
+    raise RuntimeError("Repo config file does not exist.")
+
+REPO_CONFIG: dict[str, RepoConfig] = json.loads(REPO_PATH.read_text())
 
 
 class TokenAuthMiddleware(AbstractAuthenticationMiddleware):
@@ -72,7 +86,7 @@ async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> R
     module = importlib.import_module("rtfs.node")
     module = importlib.reload(module)
 
-    indexer = Indexes()
+    indexer = Indexes(REPO_CONFIG)
     success = indexer.reload()
     request.state.rtfs = indexer
 
@@ -84,7 +98,7 @@ async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> R
 
 
 def get_rtfs_indexes(app: Litestar) -> None:
-    app.state.rtfs = Indexes()
+    app.state.rtfs = Indexes(REPO_CONFIG)
 
 
 def _bypass_for_owner(request: Request[Any, Any, Any]) -> bool:

@@ -1,0 +1,37 @@
+{
+    "discord.py": {
+        "repo_path": "repos/discord.py",
+        "index_folder": "discord",
+        "repo_url": "https://github.com/Rapptz/discord.py"
+    },
+    "discord": {
+        "repo_path": "repos/discord.py",
+        "index_folder": "discord",
+        "repo_url": "https://github.com/Rapptz/discord.py"
+    },
+    "wavelink": {
+        "repo_path": "repos/wavelink",
+        "index_folder": "wavelink",
+        "repo_url": "https://github.com/PythonistaGuild/Wavelink"
+    },
+    "aiohttp": {
+        "repo_path": "repos/aiohttp",
+        "index_folder": "aiohttp",
+        "repo_url": "https://github.com/aio-libs/aiohttp"
+    },
+    "hondana": {
+        "repo_path": "repos/hondana",
+        "index_folder": "hondana",
+        "repo_url": "https://github.com/AbstractUmbra/Hondana"
+    },
+    "mystbin.py": {
+        "repo_path": "repos/mystbin.py",
+        "index_folder": "mystbin",
+        "repo_url": "https://github.com/PythonistaGuild/mystbin.py"
+    },
+    "jishaku": {
+        "repo_path": "repos/jishaku",
+        "index_folder": "jishaku",
+        "repo_url": "https://github.com/Gorialis/Jishaku"
+    }
+}
