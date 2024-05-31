@@ -13,9 +13,11 @@ from litestar.middleware import AbstractAuthenticationMiddleware, Authentication
 from litestar.middleware.base import DefineMiddleware
 from litestar.middleware.rate_limit import RateLimitConfig
 
-from .node import Indexes
+from .indexer import Indexes
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from litestar.connection import ASGIConnection
     from litestar.datastructures import State
 
@@ -51,7 +53,7 @@ def current_rtfs(state: State) -> Indexes:
 
 
 @get(path="/", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
-async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[dict[str, Any]]:
+async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[Mapping[str, Any]]:
     query_search = query.get("search")
     library = query.get("library", "").lower()
     format_ = query.get("format", "url")

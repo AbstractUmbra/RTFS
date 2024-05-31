@@ -8,17 +8,12 @@ import os
 import pathlib
 import re
 import subprocess
-import time
-from typing import TYPE_CHECKING, Any
 
 from yarl import URL
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 VERSION_REGEX = re.compile(r"__version__\s*=\s*(?:'|\")((?:\w|\.)*)(?:'|\")")
-
-if TYPE_CHECKING:
-    from ._types.repo_config import RepoConfig
 
 __all__ = ("Node",)
 
@@ -29,6 +24,7 @@ def _get_attr_name(attr: ast.Attribute) -> str | None:
 
 
 class Node:
+    url: str
     __slots__ = (
         "file",
         "line",
@@ -45,14 +41,12 @@ class Node:
         line: int,
         end_line: int | None,
         name: str,
-        url: str | None,
         source: str,
     ) -> None:
         self.file = file
         self.line = line
         self.end_line = end_line
         self.name = name
-        self.url = url
         self.source = source
 
     def __repr__(self) -> str:
@@ -164,7 +158,6 @@ class Index:
                             line=body_part.lineno,
                             end_line=body_part.end_lineno,
                             name=name,
-                            url=None,
                             source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                         )
 
@@ -184,7 +177,6 @@ class Index:
                             line=body_part.lineno,
                             end_line=body_part.end_lineno,
                             name=name,
-                            url=None,
                             source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                         )
             elif isinstance(body_part, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -195,7 +187,6 @@ class Index:
                         line=body_part.lineno,
                         end_line=body_part.end_lineno,
                         name=name,
-                        url=None,
                         source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                     )
                 self.index_class_function(nodes, cls, src, body_part)
@@ -215,7 +206,6 @@ class Index:
                     line=body.lineno,
                     end_line=body.end_lineno,
                     name=body.name,
-                    url=None,
                     source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                 )
                 self.index_class(nodes=inner_nodes, src=lines, cls=body)
@@ -227,7 +217,6 @@ class Index:
                         line=body.lineno,
                         end_line=body.end_lineno,
                         name=name,
-                        url=None,
                         source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                     )
             elif isinstance(body, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -239,7 +228,6 @@ class Index:
                         line=body.lineno,
                         end_line=body.end_lineno,
                         name=name,
-                        url=None,
                         source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                     )
 
@@ -284,75 +272,3 @@ class Index:
 
     def find_matches(self, word: str) -> list[Node]:
         return [self.nodes[v] for v in difflib.get_close_matches(word, self.keys, cutoff=0.55)]
-
-
-class Indexes:
-    __indexable: dict[str, Index]
-
-    def __init__(self, config: dict[str, RepoConfig], /) -> None:
-        self.index: dict[str, Index] = {}
-        self._is_indexed: bool = False
-        self._load_config(config)
-        self._do_index()
-
-    @property
-    def indexed(self) -> bool:
-        return self._is_indexed
-
-    @property
-    def libraries(self) -> dict[str, str | None]:
-        return {lib: index.version for lib, index in self.__indexable.items()}
-
-    def _load_config(self, config: dict[str, RepoConfig], /) -> None:
-        self.__indexable = {k: Index(**v) for k, v in config.items()}
-
-    def get_query(self, lib: str, query: str) -> dict[str, Any] | None:
-        if not self._is_indexed:
-            # todo, lock?
-            raise RuntimeError("Indexing is not complete.")
-
-        if lib not in self.index:
-            return None
-
-        start = time.monotonic()
-        result = self.index[lib].find_matches(query)
-        end = time.monotonic() - start
-        return {
-            "nodes": {x.name: {"source": x.source, "url": x.url} for x in result},
-            "query_time": end,
-            "commit": self.index[lib].commit,
-        }
-
-    def _do_pull(self, index: Index) -> bool:
-        try:
-            subprocess.run(["/bin/bash", "-c", f"cd {index.repo_path} && git pull"])
-        except:
-            return False
-
-        return True
-
-    def _do_index(self) -> None:
-        LOGGER.info("Starting indexing.")
-
-        amount = len(self.__indexable)
-
-        for idx, (name, index) in enumerate(self.__indexable.items(), start=1):
-            LOGGER.info("Indexing module %r (%s/%s)", name, idx, amount)
-
-            self.index[name] = index
-            index.index_lib()
-            LOGGER.info("Finished indexing module %r (%s nodes)", name, len(index.nodes))
-
-        LOGGER.info("Indexing complete!")
-        self._is_indexed = True
-
-    def reload(self) -> bool:
-        self._is_indexed = False
-        success: list[str] = []
-        for name, value in self.__indexable.items():
-            if self._do_pull(value):
-                success.append(name)
-
-        self._do_index()
-
-        return len(success) == len(self.__indexable)
