@@ -47,9 +47,9 @@ class Indexes:
         result = self.index[lib].find_matches(query)
         end = time.monotonic() - start
         return {
-            "nodes": {x.name: {"source": x.source, "url": x.url} for x in result},
+            "results": {x.name: {"source": x.source, "url": x.url} for x in result},
             "query_time": end,
-            "commit": self.index[lib].commit,
+            "commit_sha": self.index[lib].commit,
         }
 
     def _do_pull(self, index: Index) -> bool:

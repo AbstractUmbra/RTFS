@@ -9,6 +9,6 @@ class NodeResponse(TypedDict):
 
 
 class Response(TypedDict):
-    nodes: dict[str, NodeResponse]
+    results: dict[str, NodeResponse]
     query_time: float
-    commit: str | None
+    commit_sha: str | None
