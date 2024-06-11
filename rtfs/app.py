@@ -85,7 +85,7 @@ async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[Mapping[str
 
 @post(path="/refresh", middleware=[auth_middleware], dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
 async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:
-    module = importlib.import_module("rtfs.node")
+    module = importlib.import_module("rtfs.index")
     module = importlib.reload(module)
 
     indexer = Indexes(REPO_CONFIG)
@@ -123,4 +123,8 @@ RL_CONFIG = RateLimitConfig(
     rate_limit_reset_header_key="X-Ratelimit-Reset",
 )
 
-APP = Litestar(route_handlers=[get_rtfs, refresh_indexes], on_startup=[get_rtfs_indexes], middleware=[RL_CONFIG.middleware])
+APP = Litestar(
+    route_handlers=[get_rtfs, refresh_indexes],
+    on_startup=[get_rtfs_indexes],
+    middleware=[RL_CONFIG.middleware],
+)
