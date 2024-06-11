@@ -260,9 +260,10 @@ class Index:
             node.url = f"{self.repo_url}/blob/{self.branch}/{node.file}#L{node.line}-L{node.end_line}"
 
         self.keys = list(self.nodes.keys())
+        version_dunder = self.nodes.get("version")
 
-        if not self.version and "__version__" in self.keys:
-            version = VERSION_REGEX.search(self.nodes["__version__"].source)
+        if not self.version and version_dunder:
+            version = VERSION_REGEX.search(version_dunder.source)
             if version:
                 self.version = version.group(1)
             else:
