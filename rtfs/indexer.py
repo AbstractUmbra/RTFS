@@ -52,6 +52,23 @@ class Indexes:
             "commit_sha": self.index[lib].commit,
         }
 
+    def get_direct(self, lib: str, query: str) -> Response | None:
+        if not self._is_indexed:
+            raise RuntimeError("Indexing is not complete.")
+
+        if lib not in self.index:
+            return
+
+        start = time.monotonic()
+        result = self.index[lib].nodes.get(query)
+        end = time.monotonic() - start
+
+        return {
+            "results": {result.name: {"source": result.source, "url": result.url}} if result else None,
+            "query_time": end,
+            "commit_sha": self.index[lib].commit,
+        }
+
     def _do_pull(self, index: Index) -> bool:
         try:
             subprocess.run(["/bin/bash", "-c", f"cd {index.repo_path} && git pull"])

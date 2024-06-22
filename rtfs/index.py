@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import configparser
-import difflib
 import logging
 import os
 import pathlib
@@ -10,6 +9,8 @@ import re
 import subprocess
 
 from yarl import URL
+
+from .fuzzy import extract
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -272,4 +273,4 @@ class Index:
                 )
 
     def find_matches(self, word: str) -> list[Node]:
-        return [self.nodes[v] for v in difflib.get_close_matches(word, self.keys, cutoff=0.55)]
+        return [self.nodes[v[0]] for v in extract(word, self.keys, score_cutoff=20, limit=3)]

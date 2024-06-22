@@ -53,24 +53,16 @@ def current_rtfs(state: State) -> Indexes:
 
 
 @get(path="/", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
-async def get_rtfs(query: dict[str, str], rtfs: Indexes) -> Response[Mapping[str, Any]]:
-    query_search = query.get("search")
-    library = query.get("library", "").lower()
-    format_ = query.get("format", "url")
-
-    if not query_search or not library:
+async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:
+    if not search or not library:
         return Response(content={"available_libraries": rtfs.libraries}, media_type=MediaType.JSON, status_code=200)
-    elif not query_search:
+    elif not search:
         return Response({"error": "Missing `search` query parameter."}, media_type=MediaType.JSON, status_code=400)
     elif not library:
         return Response({"error": "Missing `library` query parameter."}, media_type=MediaType.JSON, status_code=400)
 
-    if format_ not in ("url", "source"):
-        return Response(
-            {"error": "The `format` parameter must be `url` or `source`."}, media_type=MediaType.JSON, status_code=400
-        )
+    result = rtfs.get_direct(library, search) if direct else rtfs.get_query(library, search)
 
-    result = rtfs.get_query(library, query_search)
     if result is None:
         return Response(
             content={
