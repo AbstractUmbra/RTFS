@@ -100,10 +100,7 @@ def _bypass_for_owner(request: Request[Any, Any, Any]) -> bool:
     if not auth:
         return True
 
-    if auth == OWNER_TOKEN:
-        return False
-
-    return True
+    return auth != OWNER_TOKEN
 
 
 RL_CONFIG = RateLimitConfig(

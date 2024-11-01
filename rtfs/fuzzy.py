@@ -142,7 +142,7 @@ def extract(
     limit: int | None = 10,
 ) -> list[tuple[str, int]] | list[tuple[str, int, T]]:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-    key = lambda t: t[1]
+    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = lambda t: t[1]
     if limit is not None:
         return heapq.nlargest(limit, it, key=key)  # type: ignore
     return sorted(it, key=key, reverse=True)  # type: ignore
@@ -176,7 +176,7 @@ def extract_one(
     score_cutoff: int = 0,
 ) -> tuple[str, int] | None | tuple[str, int, T] | None:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-    key = lambda t: t[1]
+    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = lambda t: t[1]
     try:
         return max(it, key=key)
     except:
@@ -263,7 +263,7 @@ def extract_matches(
         return []
 
     top_score = matches[0][1]
-    to_return = []
+    to_return: list[tuple[str, int]] | list[tuple[str, int, T]] = []
     index = 0
     while True:
         try:
@@ -276,7 +276,7 @@ def extract_matches(
         if match[1] != top_score:
             break
 
-        to_return.append(match)
+        to_return.append(match)  # pyright: ignore[reportArgumentType] # dynamic
     return to_return
 
 
