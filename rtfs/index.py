@@ -27,12 +27,12 @@ def _get_attr_name(attr: ast.Attribute) -> str | None:
 class Node:
     url: str
     __slots__ = (
+        "end_line",
         "file",
         "line",
-        "end_line",
         "name",
-        "url",
         "source",
+        "url",
     )
 
     def __init__(
@@ -56,14 +56,14 @@ class Node:
 
 class Index:
     __slots__ = (
-        "repo_path",
-        "index_folder",
-        "repo_url",
-        "version",
         "branch",
         "commit",
-        "nodes",
+        "index_folder",
         "keys",
+        "nodes",
+        "repo_path",
+        "repo_url",
+        "version",
     )
 
     def __init__(
