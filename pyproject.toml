@@ -9,6 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 litestar = { version = "*", extras = ["standard"] }
+uvicorn = "*"
 yarl = "*"
 
 [tool.poetry.group.dev.dependencies]
@@ -29,7 +30,7 @@ select = [
     "PTH",
     "RUF",
     "SIM",
-    "TCH",
+    "TC",
     "UP",
     "W",
     "PERF",
@@ -48,8 +49,6 @@ ignore = [
     "S101",
     "UP034",
     "UP038",
-    "ANN101",
-    "ANN102",
     "ANN401",
 ]
 exclude = ["repos/"]
