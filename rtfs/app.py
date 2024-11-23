@@ -25,9 +25,15 @@ if TYPE_CHECKING:
 
 __all__ = ("APP",)
 
-OWNER_TOKEN = os.getenv("API_TOKEN")
-if not OWNER_TOKEN:
-    raise RuntimeError("Sorry, we required an `API_TOKEN` environment variable to be present.")
+API_KEY_FILE = os.getenv("API_KEY_FILE")
+if not API_KEY_FILE:
+    raise RuntimeError("Sorry, we required an `API_KEY_FILE` environment variable to be present.")
+
+try:
+    with pathlib.Path(API_KEY_FILE).open("r") as fp:
+        API_KEY = fp.read().strip()
+except FileNotFoundError as err:
+    raise RuntimeError("Sorry, but the API_KEY_FILE path is incorrect or cannot be found.") from err
 
 REPO_PATH = pathlib.Path().parent / "repos.json"
 if not REPO_PATH.exists():
@@ -39,7 +45,7 @@ REPO_CONFIG: dict[str, RepoConfig] = json.loads(REPO_PATH.read_text())
 class TokenAuthMiddleware(AbstractAuthenticationMiddleware):
     async def authenticate_request(self, connection: ASGIConnection[Any, Any, Any, Any]) -> AuthenticationResult:
         auth_header = connection.headers.get("Authorization")
-        if not auth_header or auth_header != OWNER_TOKEN:
+        if not auth_header or auth_header != API_KEY:
             raise NotAuthorizedException()
 
         return AuthenticationResult(user="Owner", auth=auth_header)
@@ -100,7 +106,7 @@ def _bypass_for_owner(request: Request[Any, Any, Any]) -> bool:
     if not auth:
         return True
 
-    return auth != OWNER_TOKEN
+    return auth != API_KEY
 
 
 RL_CONFIG = RateLimitConfig(

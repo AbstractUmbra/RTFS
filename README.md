@@ -12,11 +12,20 @@ services:
         container_name: rtfs
         ports:
             - 8130:8130
-        env_file:
-            - .env
+        secrets:
+            API_KEY_FILE: /run/secrets/api_key
+
+secrets:
+    api_key:
+        file: ./api_key
 ```
 
-You need to provide the .env file, ideally from the `.env.template` file provided.
+You need to provide the secrets file which contains the owner/admin api key.
+You can make one really quickly using the following command:-
+```sh
+openssl rand -base64 64 > api_key
+```
+Which will generate a secure and random key for you.
 
 ### No Docker
-You can run this by installing the necessary dependencies defined in the `pyproject.toml` and running `run.py`. You'll need to set an `API_TOKEN` environment variable in this case with a unique secure value.
+You can run this by installing the necessary dependencies defined in the `pyproject.toml` and running `run.py`. You'll need to set an `API_KEY_FILE` environment variable in this case which points to a file with a secure key within.

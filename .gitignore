@@ -1,3 +1,6 @@
+__pycache__/
+.venv/
 repos/
 test.py
-.env
+api_key
+compose.override.yaml

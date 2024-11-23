@@ -3,12 +3,13 @@ services:
     image: ghcr.io/abstractumbra/rtfs:latest
     container_name: "rtfs"
     restart: "unless-stopped"
-    env_file:
-      - .env
-    networks:
-      main:
+    environment:
+      API_KEY_FILE: /run/secrets/api_key
+    ports:
+      - 8030:8030
+    secrets:
+      - api_key
 
-networks:
-  main:
-    external:
-      true
+secrets:
+  api_key:
+    file: ./api_key
