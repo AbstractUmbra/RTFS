@@ -6,7 +6,7 @@ import logging
 import os
 import pathlib
 import re
-import subprocess
+import subprocess  # noqa: S404 # accepted use
 
 from yarl import URL
 
@@ -22,6 +22,8 @@ __all__ = ("Node",)
 def _get_attr_name(attr: ast.Attribute) -> str | None:
     if type(attr.value) is ast.Attribute:
         return _get_attr_name(attr.value)
+
+    return None
 
 
 class Node:
@@ -102,12 +104,13 @@ class Index:
 
         proc.extend(branch)
 
-        subprocess.run(proc)
+        subprocess.run(proc, check=False)  # noqa: S603 # trusted input
 
     def _process_git_dir(self) -> str:
         git_path = self.repo_path / ".git"
         if not git_path.exists():
-            raise ValueError(f"{self.repo_path} does not appear to be a valid git directory.")
+            msg = f"{self.repo_path} does not appear to be a valid git directory."
+            raise ValueError(msg)
 
         head_path = git_path / "HEAD"
         current_branch = head_path.read_text("utf-8").rsplit("/")[-1]
@@ -120,7 +123,8 @@ class Index:
     def _process_git_config(self) -> str:
         git_config_path = self.repo_path / ".git" / "config"
         if not git_config_path.exists():
-            raise ValueError(f"{self.repo_path} does not appear to be a valid git directory.")
+            msg = f"{self.repo_path} does not appear to be a valid git directory."
+            raise ValueError(msg)
 
         config = configparser.ConfigParser()
         config.read_string(git_config_path.read_text("utf-8"))
@@ -192,7 +196,7 @@ class Index:
                     )
                 self.index_class_function(nodes, cls, src, body_part)
 
-    def index_file(self, nodes: dict[str, Node], fp: pathlib.Path, dirs: list[str], is_utils: bool = False) -> None:
+    def index_file(self, nodes: dict[str, Node], fp: pathlib.Path, dirs: list[str], *, is_utils: bool = False) -> None:
         inner_nodes: dict[str, Node] = {}
 
         opened = fp.read_text("utf-8")
@@ -252,7 +256,7 @@ class Index:
             if new_path.exists() and new_path.is_dir():
                 self.index_directory(nodes, idx_path, parents, file)
             elif file.endswith(".py"):
-                self.index_file(nodes, new_path, [*parents, file], file in ("utils.py", "utilities.py"))
+                self.index_file(nodes, new_path, [*parents, file], is_utils=file in ("utils.py", "utilities.py"))
 
     def index_lib(self) -> None:
         self.index_directory(self.nodes, self.repo_path, [], self.index_folder)
@@ -269,7 +273,9 @@ class Index:
                 self.version = version.group(1)
             else:
                 LOGGER.error(
-                    "Unable to ascertain version: %r (%r)", self.nodes["__version__"], self.nodes["__version__"].source
+                    "Unable to ascertain version: %r (%r)",
+                    self.nodes["__version__"],
+                    self.nodes["__version__"].source,
                 )
 
     def find_matches(self, word: str) -> list[Node]:

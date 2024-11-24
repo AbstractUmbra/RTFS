@@ -30,7 +30,7 @@ if not API_KEY_FILE:
     raise RuntimeError("Sorry, we required an `API_KEY_FILE` environment variable to be present.")
 
 try:
-    with pathlib.Path(API_KEY_FILE).open("r") as fp:
+    with pathlib.Path(API_KEY_FILE).open("r", encoding="utf8") as fp:
         API_KEY = fp.read().strip()
 except FileNotFoundError as err:
     raise RuntimeError("Sorry, but the API_KEY_FILE path is incorrect or cannot be found.") from err
@@ -46,7 +46,7 @@ class TokenAuthMiddleware(AbstractAuthenticationMiddleware):
     async def authenticate_request(self, connection: ASGIConnection[Any, Any, Any, Any]) -> AuthenticationResult:
         auth_header = connection.headers.get("Authorization")
         if not auth_header or auth_header != API_KEY:
-            raise NotAuthorizedException()
+            raise NotAuthorizedException
 
         return AuthenticationResult(user="Owner", auth=auth_header)
 
@@ -59,12 +59,12 @@ def current_rtfs(state: State) -> Indexes:
 
 
 @get(path="/", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
-async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:
+async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:  # noqa: FBT001, RUF029 # required use of literstar callbacks
     if not search or not library:
         return Response(content={"available_libraries": rtfs.libraries}, media_type=MediaType.JSON, status_code=200)
-    elif not search:
+    if not search:
         return Response({"error": "Missing `search` query parameter."}, media_type=MediaType.JSON, status_code=400)
-    elif not library:
+    if not library:
         return Response({"error": "Missing `library` query parameter."}, media_type=MediaType.JSON, status_code=400)
 
     result = rtfs.get_direct(library, search) if direct else rtfs.get_query(library, search)
@@ -72,7 +72,10 @@ async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes
     if result is None:
         return Response(
             content={
-                "error": f"The library {library!r} cannot be found, if you think this should be added then request it via `hyliantwink` on discord."
+                "error": (
+                    f"The library {library!r} cannot be found, "
+                    "if you think this should be added then request it via `hyliantwink` on discord."
+                ),
             },
             media_type=MediaType.JSON,
             status_code=status_codes.HTTP_418_IM_A_TEAPOT,
@@ -82,7 +85,7 @@ async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes
 
 
 @post(path="/refresh", middleware=[auth_middleware], dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
-async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:
+async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # acceptable use
     module = importlib.import_module("rtfs.index")
     module = importlib.reload(module)
 

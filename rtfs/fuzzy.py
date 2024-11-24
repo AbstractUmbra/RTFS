@@ -9,6 +9,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import heapq
+import operator
 import re
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Literal, TypeVar, overload
@@ -142,10 +143,10 @@ def extract(
     limit: int | None = 10,
 ) -> list[tuple[str, int]] | list[tuple[str, int, T]]:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = lambda t: t[1]
+    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = operator.itemgetter(1)
     if limit is not None:
-        return heapq.nlargest(limit, it, key=key)  # type: ignore
-    return sorted(it, key=key, reverse=True)  # type: ignore
+        return heapq.nlargest(limit, it, key=key)  # pyright: ignore[reportReturnType] # we use a list
+    return sorted(it, key=key, reverse=True)  # pyright: ignore[reportReturnType] # we use a list
 
 
 @overload
@@ -174,12 +175,12 @@ def extract_one(
     *,
     scorer: Callable[[str, str], int] = quick_ratio,
     score_cutoff: int = 0,
-) -> tuple[str, int] | None | tuple[str, int, T] | None:
+) -> tuple[str, int] | tuple[str, int, T] | None:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = lambda t: t[1]
+    key: Callable[[tuple[str, int, T] | tuple[str, int]], int] = operator.itemgetter(1)
     try:
         return max(it, key=key)
-    except:
+    except Exception:  # noqa: BLE001 # what can `max` actually raise...
         # iterator could return nothing
         return None
 
@@ -226,7 +227,7 @@ def extract_or_exact(
 
     # check if the top one is exact or more than 30% more correct than the top
     if top == 100 or top > (second + 30):
-        return [matches[0]]  # type: ignore
+        return [matches[0]]  # pyright: ignore[reportReturnType]
 
     return matches
 
@@ -334,8 +335,7 @@ def finder(
 
     if raw:
         return sorted(suggestions, key=sort_key)
-    else:
-        return [z for _, _, z in sorted(suggestions, key=sort_key)]
+    return [z for _, _, z in sorted(suggestions, key=sort_key)]
 
 
 def find(text: str, collection: Iterable[str], *, key: Callable[[str], str] | None = None) -> str | None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import subprocess
+import subprocess  # noqa: S404 # accepted use
 import time
 from typing import TYPE_CHECKING
 
@@ -57,7 +57,7 @@ class Indexes:
             raise RuntimeError("Indexing is not complete.")
 
         if lib not in self.index:
-            return
+            return None
 
         start = time.monotonic()
         result = self.index[lib].nodes.get(query)
@@ -71,8 +71,8 @@ class Indexes:
 
     def _do_pull(self, index: Index) -> bool:
         try:
-            subprocess.run(["/bin/bash", "-c", f"cd {index.repo_path} && git pull"])
-        except:
+            subprocess.run(["/bin/bash", "-c", f"cd {index.repo_path} && git pull"], check=False)  # noqa: S603 # trusted input
+        except (ValueError, subprocess.CalledProcessError):
             return False
 
         return True
