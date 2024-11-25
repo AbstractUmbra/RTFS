@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
 
 import yarl
 from litestar import Litestar, MediaType, Request, Response, get, post, status_codes
@@ -13,7 +14,12 @@ from litestar.exceptions import NotAuthorizedException
 from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
 from litestar.middleware.base import DefineMiddleware
 from litestar.middleware.rate_limit import RateLimitConfig
+from litestar.openapi.config import OpenAPIConfig
+from litestar.openapi.datastructures import ResponseSpec
+from litestar.openapi.plugins import ScalarRenderPlugin
+from litestar.openapi.spec import Components, SecurityScheme
 
+from ._types.results import RefreshResponse, Response as RTFSResponse
 from .indexer import Indexes
 
 if TYPE_CHECKING:
@@ -83,13 +89,40 @@ def _validate_url(url: str) -> bool:
     # only accepted git hosts, only https and only one owner/repo
     return parsed.host in ACCEPTABLE_HOSTS and parsed.scheme == "https" and parsed.path.count("/") == 2
 
+
+@get(
+    path="/",
+    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
+    description="Get the source code from a library class or method.",
+    name="RTFS",
+    responses={
+        200: ResponseSpec(data_container=RTFSResponse, description="Search results"),
+        202: ResponseSpec(
+            data_container=dict[Literal["available_libraries"], list[str]],
+            description="All available RTFS libraries.",
+        ),
+        400: ResponseSpec(data_container=dict[Literal["error"], str], description="An error was found in your query."),
+    },
+)
 async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:  # noqa: FBT001, RUF029 # required use of literstar callbacks
     if not search or not library:
-        return Response(content={"available_libraries": rtfs.libraries}, media_type=MediaType.JSON, status_code=200)
+        return Response(
+            content={"available_libraries": rtfs.libraries},
+            media_type=MediaType.JSON,
+            status_code=status_codes.HTTP_202_ACCEPTED,
+        )
     if not search:
-        return Response({"error": "Missing `search` query parameter."}, media_type=MediaType.JSON, status_code=400)
+        return Response(
+            content={"error": "Missing `search` query parameter."},
+            media_type=MediaType.JSON,
+            status_code=status_codes.HTTP_400_BAD_REQUEST,
+        )
     if not library:
-        return Response({"error": "Missing `library` query parameter."}, media_type=MediaType.JSON, status_code=400)
+        return Response(
+            content={"error": "Missing `library` query parameter."},
+            media_type=MediaType.JSON,
+            status_code=status_codes.HTTP_400_BAD_REQUEST,
+        )
 
     result = rtfs.get_direct(library, search) if direct else rtfs.get_query(library, search)
 
@@ -102,18 +135,24 @@ async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes
                 ),
             },
             media_type=MediaType.JSON,
-            status_code=status_codes.HTTP_418_IM_A_TEAPOT,
+            status_code=status_codes.HTTP_404_NOT_FOUND,
         )
 
     return Response(content=result, media_type=MediaType.JSON, status_code=200)
 
 
-@post(path="/refresh", middleware=[auth_middleware], dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
+@post(
+    path="/refresh",
+    middleware=[auth_middleware],
+    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
+    description="Refresh the existing indexes with latest changes in their respective repositories",
+    name="Refresh Indexes",
+    responses={202: ResponseSpec(data_container=RefreshResponse, description="Results of the refresh")},
+    security=[{"apiKey": []}],
+)
 async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # acceptable use
-    module = importlib.import_module("rtfs.index")
-    module = importlib.reload(module)
+    indexer = _reload_indexer(REPO_CONFIG)
 
-    indexer = Indexes(REPO_CONFIG)
     success = indexer.reload()
     request.state.rtfs = indexer
 
@@ -189,4 +228,21 @@ APP = Litestar(
     route_handlers=[get_rtfs, refresh_indexes, add_new_index],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
+    openapi_config=OpenAPIConfig(
+        title="RTFS",
+        description="A small web api for providing the source code to library methods.",
+        version="0.0.1",
+        components=Components(
+            security_schemes={
+                "apiKey": SecurityScheme(
+                    type="apiKey",
+                    description="The owner/auth api key",
+                    security_scheme_in="header",
+                    name="Authorization",
+                ),
+            },
+        ),
+        render_plugins=[ScalarRenderPlugin()],
+        path="/docs",
+    ),
 )
