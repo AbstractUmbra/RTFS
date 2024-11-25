@@ -4,8 +4,9 @@ import importlib
 import json
 import os
 import pathlib
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
 
+import yarl
 from litestar import Litestar, MediaType, Request, Response, get, post, status_codes
 from litestar.di import Provide
 from litestar.exceptions import NotAuthorizedException
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
     from ._types.repo_config import RepoConfig
 
+
 __all__ = ("APP",)
 
 API_KEY_FILE = pathlib.Path("/run/secrets/api_key")
@@ -39,6 +41,14 @@ if not REPO_PATH.exists():
     raise RuntimeError("Repo config file does not exist.")
 
 REPO_CONFIG: dict[str, RepoConfig] = json.loads(REPO_PATH.read_text())
+ACCEPTABLE_HOSTS: set[str] = {"github.com", "gitlab.com"}
+
+
+@dataclass
+class NewIndex:
+    name: str
+    directory: str  # name of the directory the source is located in
+    url: str
 
 
 class TokenAuthMiddleware(AbstractAuthenticationMiddleware):
@@ -57,7 +67,22 @@ def current_rtfs(state: State) -> Indexes:
     return state.rtfs
 
 
-@get(path="/", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)})
+def _reload_indexer(config: dict[str, RepoConfig]) -> Indexes:
+    module = importlib.import_module("rtfs.index")
+    module = importlib.reload(module)
+
+    return Indexes(REPO_CONFIG)
+
+
+def _validate_url(url: str) -> bool:
+    try:
+        parsed = yarl.URL(url)
+    except (ValueError, TypeError):
+        return False
+
+    # only accepted git hosts, only https and only one owner/repo
+    return parsed.host in ACCEPTABLE_HOSTS and parsed.scheme == "https" and parsed.path.count("/") == 2
+
 async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:  # noqa: FBT001, RUF029 # required use of literstar callbacks
     if not search or not library:
         return Response(content={"available_libraries": rtfs.libraries}, media_type=MediaType.JSON, status_code=200)
@@ -99,6 +124,46 @@ async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> R
     )
 
 
+@post(
+    path="/new",
+    middleware=[auth_middleware],
+    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
+    description="Add a new repo to the index.",
+    name="Add new repo to the index.",
+    responses={201: ResponseSpec(data_container=RefreshResponse, description="Results of adding the new repo.")},
+    security=[{"apiKey": []}],
+)
+async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # required for callback
+    if data.name in REPO_CONFIG:
+        return Response(content={"error": "Already tracking this repo."}, media_type=MediaType.JSON, status_code=400)
+
+    if not _validate_url(data.url):
+        return Response(
+            content={"error": f"{data.url!r} is not a valid URL."},
+            media_type=MediaType.JSON,
+            status_code=400,
+        )
+
+    REPO_CONFIG[data.name] = {
+        "repo_path": f"repos/{data.name.lower()}",
+        "index_folder": data.directory,
+        "repo_url": data.url,
+    }
+
+    indexer = _reload_indexer(REPO_CONFIG)
+    success = indexer.reload()
+    request.state.rtfs = indexer
+
+    with REPO_PATH.open("w") as fp:
+        json.dump(REPO_CONFIG, fp, indent=2)
+
+    return Response(
+        content={"success": success, "commits": {name: value.commit for name, value in indexer.index.items()}},
+        media_type=MediaType.JSON,
+        status_code=201,
+    )
+
+
 def get_rtfs_indexes(app: Litestar) -> None:
     app.state.rtfs = Indexes(REPO_CONFIG)
 
@@ -121,7 +186,7 @@ RL_CONFIG = RateLimitConfig(
 )
 
 APP = Litestar(
-    route_handlers=[get_rtfs, refresh_indexes],
+    route_handlers=[get_rtfs, refresh_indexes, add_new_index],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
 )
