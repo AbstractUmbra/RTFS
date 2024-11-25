@@ -25,15 +25,14 @@ if TYPE_CHECKING:
 
 __all__ = ("APP",)
 
-API_KEY_FILE = os.getenv("API_KEY_FILE")
-if not API_KEY_FILE:
-    raise RuntimeError("Sorry, we required an `API_KEY_FILE` environment variable to be present.")
-
+API_KEY_FILE = pathlib.Path("/run/secrets/api_key")
 try:
-    with pathlib.Path(API_KEY_FILE).open("r", encoding="utf8") as fp:
-        API_KEY = fp.read().strip()
-except FileNotFoundError as err:
-    raise RuntimeError("Sorry, but the API_KEY_FILE path is incorrect or cannot be found.") from err
+    _token = API_KEY_FILE.read_text("utf8")
+except FileNotFoundError:
+    _token = os.getenv("API_KEY")
+if not _token:
+    raise RuntimeError("No API token has been provided.")
+API_KEY = _token
 
 REPO_PATH = pathlib.Path().parent / "repos.json"
 if not REPO_PATH.exists():
