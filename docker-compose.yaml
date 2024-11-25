@@ -3,6 +3,8 @@ services:
     image: ghcr.io/abstractumbra/rtfs:latest
     container_name: "rtfs"
     restart: "unless-stopped"
+    volumes:
+      - "./repos.json:/app/repos.json:rw"
     environment:
       API_KEY_FILE: /run/secrets/api_key
     ports:
