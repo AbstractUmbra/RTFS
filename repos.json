@@ -33,5 +33,10 @@
         "repo_path": "repos/jishaku",
         "index_folder": "jishaku",
         "repo_url": "https://github.com/Gorialis/Jishaku"
+    },
+    "twitchio": {
+        "repo_path": "repos/twitchio",
+        "index_folder": "twitchio",
+        "repo_url": "https://github.com/PythonistaGuild/TwitchIO"
     }
 }
