@@ -1,20 +1,20 @@
-[tool.poetry]
+[project]
 name = "rtfs"
 version = "0.1.0"
 description = "A small API that parses the source code of libraries to provide a quick and easy source viewing"
-authors = ["Alex Nørgaard <umbra@abstractumbra.dev>"]
-license = "GPLv3"
+authors = [{ name = "Alex Nørgaard", email = "umbra@abstractumbra.dev" }]
+dependencies = ["litestar[standard]", "uvicorn", "yarl"]
+requires-python = "<4.0,>=3.12"
 readme = "README.md"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-litestar = { version = "*", extras = ["standard"] }
-uvicorn = "*"
-yarl = "*"
+[dependency-groups]
+dev = ["ruff", "typing-extensions"]
 
-[tool.poetry.group.dev.dependencies]
-ruff = "*"
-typing-extensions = "*"
+[tool.pdm]
+distribution = false
+
+[tool.pdm.build]
+includes = []
 
 [tool.ruff]
 line-length = 125
@@ -137,7 +137,3 @@ useLibraryCodeForTypes = true
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
 exclude = ["repos", ".venv/"]
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

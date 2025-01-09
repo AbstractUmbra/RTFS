@@ -1,5 +1,7 @@
 __pycache__/
 .venv/
+.pdm-python
+
 repos/
 test.py
 api_key
