@@ -96,15 +96,14 @@ class Index:
         self.commit = self._process_current_commit()
 
     def _clone_repo(self, url: URL, path: pathlib.Path, branch_name: str | None) -> None:
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
 
         proc = ["git", "clone", str(url), str(self.repo_path)]
-        branch = ["&&", "git", "checkout", branch_name] if branch_name else []
+        branch = ["-b", branch_name] if branch_name else []
 
         proc.extend(branch)
 
-        subprocess.run(proc, check=False)  # noqa: S603 # trusted input
+        subprocess.run(proc, check=True)  # noqa: S603 # trusted input
 
     def _process_git_dir(self) -> str:
         git_path = self.repo_path / ".git"
