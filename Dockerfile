@@ -8,9 +8,12 @@ ENV PDM_CHECK_UPDATE=false
 RUN pip install -U pdm
 
 WORKDIR /project
-COPY . /project/
 
-RUN pdm install --check --prod --no-editable
+RUN --mount=type=cache,target=/project/.venv/ \
+    --mount=type=bind,source=pyproject.toml,target=/project/pyproject.toml,readwrite \
+    --mount=type=bind,source=pdm.lock,target=/project/pdm.lock,readwrite \
+    pdm install --check --prod --no-editable && \
+    cp -R /project/.venv /project/.ready-venv
 
 FROM python:${PYTHON_BASE}
 
@@ -24,7 +27,7 @@ RUN apt-get update -y \
 
 WORKDIR /app
 
-COPY --from=builder /project/.venv /app/.venv
+COPY --from=builder /project/.ready-venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 COPY . /app/
 
