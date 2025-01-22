@@ -40,7 +40,7 @@ except FileNotFoundError:
     _token = os.getenv("API_KEY")
 if not _token:
     raise RuntimeError("No API token has been provided.")
-API_KEY = _token
+API_KEY = _token.rstrip()
 
 REPO_PATH = pathlib.Path().parent / "repos.json"
 if not REPO_PATH.exists():
@@ -104,7 +104,12 @@ def _validate_url(url: str) -> bool:
         400: ResponseSpec(data_container=dict[Literal["error"], str], description="An error was found in your query."),
     },
 )
-async def get_rtfs(search: str, library: str, direct: bool | None, rtfs: Indexes) -> Response[Mapping[str, Any]]:  # noqa: FBT001, RUF029 # required use of literstar callbacks
+async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
+    search: str | None,
+    library: str | None,
+    direct: bool | None,  # noqa: FBT001 # required in use of litestar callbacks
+    rtfs: Indexes,
+) -> Response[Mapping[str, Any]]:
     if not search or not library:
         return Response(
             content={"available_libraries": rtfs.libraries},

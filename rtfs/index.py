@@ -245,7 +245,7 @@ class Index:
         parents = (parents and parents.copy()) or []
         target = idx_path.joinpath(*parents, index_dir)
         parents.append(index_dir)
-        idx = os.listdir(target)
+        idx = os.listdir(target)  # noqa: PTH208 # this is okay so we don't need string manip everywhere
 
         for file in idx:
             if file in ("types", "_types", "types_", "typings", "typing"):
@@ -264,7 +264,7 @@ class Index:
             node.url = f"{self.repo_url}/blob/{self.branch}/{node.file}#L{node.line}-L{node.end_line}"
 
         self.keys = list(self.nodes.keys())
-        version_dunder = self.nodes.get("version")
+        version_dunder = self.nodes.get("__version__")
 
         if not self.version and version_dunder:
             version = VERSION_REGEX.search(version_dunder.source)
