@@ -22,12 +22,12 @@ T = TypeVar("T")
 
 def ratio(a: str, b: str) -> int:
     m = SequenceMatcher(None, a, b)
-    return int(round(100 * m.ratio()))
+    return round(100 * m.ratio())
 
 
 def quick_ratio(a: str, b: str) -> int:
     m = SequenceMatcher(None, a, b)
-    return int(round(100 * m.quick_ratio()))
+    return round(100 * m.quick_ratio())
 
 
 def partial_ratio(a: str, b: str) -> int:
@@ -47,7 +47,7 @@ def partial_ratio(a: str, b: str) -> int:
             return 100
         scores.append(r)
 
-    return int(round(100 * max(scores)))
+    return round(100 * max(scores))
 
 
 _word_regex = re.compile(r"\W", re.IGNORECASE)
@@ -86,7 +86,7 @@ def _extraction_generator(
 
 
 @overload
-def _extraction_generator(
+def _extraction_generator[T](
     query: str,
     choices: dict[str, T],
     scorer: Callable[[str, str], int] = ...,
@@ -94,7 +94,7 @@ def _extraction_generator(
 ) -> Generator[tuple[str, int, T], None, None]: ...
 
 
-def _extraction_generator(
+def _extraction_generator[T](
     query: str,
     choices: Sequence[str] | dict[str, T],
     scorer: Callable[[str, str], int] = quick_ratio,
@@ -124,7 +124,7 @@ def extract(
 
 
 @overload
-def extract(
+def extract[T](
     query: str,
     choices: dict[str, T],
     *,
@@ -134,7 +134,7 @@ def extract(
 ) -> list[tuple[str, int, T]]: ...
 
 
-def extract(
+def extract[T](
     query: str,
     choices: dict[str, T] | Sequence[str],
     *,
@@ -160,7 +160,7 @@ def extract_one(
 
 
 @overload
-def extract_one(
+def extract_one[T](
     query: str,
     choices: dict[str, T],
     *,
@@ -169,7 +169,7 @@ def extract_one(
 ) -> tuple[str, int, T] | None: ...
 
 
-def extract_one(
+def extract_one[T](
     query: str,
     choices: dict[str, T] | Sequence[str],
     *,
@@ -197,7 +197,7 @@ def extract_or_exact(
 
 
 @overload
-def extract_or_exact(
+def extract_or_exact[T](
     query: str,
     choices: dict[str, T],
     *,
@@ -207,7 +207,7 @@ def extract_or_exact(
 ) -> list[tuple[str, int, T]]: ...
 
 
-def extract_or_exact(
+def extract_or_exact[T](
     query: str,
     choices: dict[str, T] | Sequence[str],
     *,
@@ -243,7 +243,7 @@ def extract_matches(
 
 
 @overload
-def extract_matches(
+def extract_matches[T](
     query: str,
     choices: dict[str, T],
     *,
@@ -252,7 +252,7 @@ def extract_matches(
 ) -> list[tuple[str, int, T]]: ...
 
 
-def extract_matches(
+def extract_matches[T](
     query: str,
     choices: dict[str, T] | Sequence[str],
     *,
