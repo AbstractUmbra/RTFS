@@ -18,6 +18,7 @@ from litestar.openapi.config import OpenAPIConfig
 from litestar.openapi.datastructures import ResponseSpec
 from litestar.openapi.plugins import ScalarRenderPlugin
 from litestar.openapi.spec import Components, SecurityScheme
+from litestar.response import Redirect
 
 from ._types.results import RefreshResponse, Response as RTFSResponse
 from .indexer import Indexes
@@ -97,34 +98,21 @@ def _validate_url(url: str) -> bool:
     name="RTFS",
     responses={
         200: ResponseSpec(data_container=RTFSResponse, description="Search results"),
-        202: ResponseSpec(
-            data_container=dict[Literal["available_libraries"], list[str]],
-            description="All available RTFS libraries.",
-        ),
         400: ResponseSpec(data_container=dict[Literal["error"], str], description="An error was found in your query."),
     },
 )
 async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
-    search: str | None,
-    library: str | None,
-    direct: bool | None,  # noqa: FBT001 # required in use of litestar callbacks
     rtfs: Indexes,
+    search: str = "",
+    library: str = "",
+    direct: bool = False,  # noqa: FBT001, FBT002 # required for litestar callbacks
 ) -> Response[Mapping[str, Any]]:
-    if not search or not library:
-        return Response(
-            content={"available_libraries": rtfs.libraries},
-            media_type=MediaType.JSON,
-            status_code=status_codes.HTTP_202_ACCEPTED,
-        )
+    if not search and not library:
+        return Redirect(path="/docs", status_code=status_codes.HTTP_303_SEE_OTHER)
+
     if not search:
         return Response(
-            content={"error": "Missing `search` query parameter."},
-            media_type=MediaType.JSON,
-            status_code=status_codes.HTTP_400_BAD_REQUEST,
-        )
-    if not library:
-        return Response(
-            content={"error": "Missing `library` query parameter."},
+            content={"error": "Missing `search` parameter"},
             media_type=MediaType.JSON,
             status_code=status_codes.HTTP_400_BAD_REQUEST,
         )
@@ -146,16 +134,32 @@ async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
     return Response(content=result, media_type=MediaType.JSON, status_code=200)
 
 
+@get(
+    "/libraries",
+    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=True)},
+    description="List all available libraries within the tool.",
+    name="RTFS Libraries",
+    responses={200: ResponseSpec(data_container=dict[Literal["available_libraries"], dict[str, str | None]])},
+    sync_to_thread=True,
+)
+def get_rtfs_libraries(rtfs: Indexes) -> Response[Mapping[str, Any]]:
+    return Response(
+        content={"available_libraries": rtfs.libraries},
+        media_type=MediaType.JSON,
+        status_code=status_codes.HTTP_202_ACCEPTED,
+    )
+
+
 @post(
     path="/refresh",
     middleware=[auth_middleware],
-    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
     description="Refresh the existing indexes with latest changes in their respective repositories",
     name="Refresh Indexes",
     responses={202: ResponseSpec(data_container=RefreshResponse, description="Results of the refresh")},
     security=[{"apiKey": []}],
+    sync_to_thread=True,
 )
-async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # acceptable use
+def refresh_indexes(request: Request[str, str, State]) -> Response[dict[str, Any]]:
     indexer = _reload_indexer(REPO_CONFIG)
 
     success = indexer.reload()
@@ -164,7 +168,7 @@ async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> R
     return Response(
         content={"success": success, "commits": {name: value.commit for name, value in indexer.index.items()}},
         media_type=MediaType.JSON,
-        status_code=202,
+        status_code=status_codes.HTTP_202_ACCEPTED,
     )
 
 
@@ -174,7 +178,10 @@ async def refresh_indexes(request: Request[str, str, State], rtfs: Indexes) -> R
     dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
     description="Add a new repo to the index.",
     name="Add new repo to the index.",
-    responses={201: ResponseSpec(data_container=RefreshResponse, description="Results of adding the new repo.")},
+    responses={
+        201: ResponseSpec(data_container=RefreshResponse, description="Results of adding the new repo."),
+        400: ResponseSpec(data_container=dict[Literal["error"], str], description="An error was found in your query."),
+    },
     security=[{"apiKey": []}],
 )
 async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # required for callback
@@ -230,7 +237,7 @@ RL_CONFIG = RateLimitConfig(
 )
 
 APP = Litestar(
-    route_handlers=[get_rtfs, refresh_indexes, add_new_index],
+    route_handlers=[get_rtfs, get_rtfs_libraries, refresh_indexes, add_new_index],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
     openapi_config=OpenAPIConfig(
