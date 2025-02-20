@@ -141,6 +141,7 @@ async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
     name="RTFS Libraries",
     responses={200: ResponseSpec(data_container=dict[Literal["available_libraries"], dict[str, str | None]])},
     sync_to_thread=True,
+    status_code=200,
 )
 def get_rtfs_libraries(rtfs: Indexes) -> Response[Mapping[str, Any]]:
     return Response(
@@ -158,8 +159,9 @@ def get_rtfs_libraries(rtfs: Indexes) -> Response[Mapping[str, Any]]:
     responses={202: ResponseSpec(data_container=RefreshResponse, description="Results of the refresh")},
     security=[{"apiKey": []}],
     sync_to_thread=True,
+    status_code=202,
 )
-def refresh_indexes(request: Request[str, str, State]) -> Response[dict[str, Any]]:
+def refresh_indexes(request: Request[str, str, State]) -> Response[RefreshResponse]:
     indexer = _reload_indexer(REPO_CONFIG)
 
     success = indexer.reload()
@@ -169,7 +171,7 @@ def refresh_indexes(request: Request[str, str, State]) -> Response[dict[str, Any
         content={"success": success, "commits": {name: value.commit for name, value in indexer.index.items()}},
         media_type=MediaType.JSON,
         status_code=status_codes.HTTP_202_ACCEPTED,
-    )
+    )  # pyright: ignore[reportReturnType] # variance issues with `dict`
 
 
 @post(
