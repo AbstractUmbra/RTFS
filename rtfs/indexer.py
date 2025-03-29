@@ -10,6 +10,7 @@ from .index import Index
 if TYPE_CHECKING:
     from ._types.repo_config import RepoConfig
     from ._types.results import Response
+    from .index import Node
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -32,8 +33,17 @@ class Indexes:
     def libraries(self) -> dict[str, str | None]:
         return {lib: index.version for lib, index in self.__indexable.items()}
 
+    def _extract_node_from_long_name(self, lib: str, name: str) -> Node:
+        nodes = self.index[lib].nodes
+
+        for node in nodes.values():
+            if node.full_name == name:
+                return node
+        msg = f"No node by the name of {name!r} found in library {lib!r}."
+        raise ValueError(msg)
+
     def _load_config(self, config: dict[str, RepoConfig], /) -> None:
-        self.__indexable = {k: Index(**v) for k, v in config.items()}
+        self.__indexable = {k: Index(library=k, **v) for k, v in config.items()}
 
     def get_query(self, lib: str, query: str) -> Response | None:
         if not self._is_indexed:
@@ -47,7 +57,7 @@ class Indexes:
         result = self.index[lib].find_matches(query)
         end = time.monotonic() - start
         return {
-            "results": {x.name: {"source": x.source, "url": x.url} for x in result},
+            "results": {x.short_name: {"source": x.source, "url": x.url} for x in result},
             "query_time": end,
             "commit_sha": self.index[lib].commit,
         }
@@ -60,11 +70,14 @@ class Indexes:
             return None
 
         start = time.monotonic()
-        result = self.index[lib].nodes.get(query)
+        try:
+            result = self.index[lib].nodes.get(query) or self._extract_node_from_long_name(lib, query)
+        except ValueError:
+            result = None
         end = time.monotonic() - start
 
         return {
-            "results": {result.name: {"source": result.source, "url": result.url}} if result else None,
+            "results": {result.short_name: {"source": result.source, "url": result.url}} if result else None,
             "query_time": end,
             "commit_sha": self.index[lib].commit,
         }

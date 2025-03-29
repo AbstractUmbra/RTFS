@@ -217,6 +217,14 @@ async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs:
     )
 
 
+@get("/debug", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)}, status_code=200)
+async def debug(rtfs: Indexes, library: str, path: str) -> Response[Mapping[str, Any]]:  # noqa: RUF029 # required for litestar callbacks
+    item = rtfs.index[library].nodes
+    resp = {name: repr(value) for name, value in item.items()}
+
+    return Response(content=resp, media_type=MediaType.JSON, status_code=200)
+
+
 def get_rtfs_indexes(app: Litestar) -> None:
     app.state.rtfs = Indexes(REPO_CONFIG)
 
@@ -239,6 +247,7 @@ RL_CONFIG = RateLimitConfig(
 )
 
 APP = Litestar(
+    debug=False,
     route_handlers=[get_rtfs, get_rtfs_libraries, refresh_indexes, add_new_index],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],

@@ -26,13 +26,23 @@ def _get_attr_name(attr: ast.Attribute) -> str | None:
     return None
 
 
+def _transform_path(path: str) -> str:
+    # discord/ext/commands/bot.py -> discord.ext.commands.bot
+    return path.replace("/", ".").removesuffix(".py")
+
+
+def _has_overload(nodes: list[ast.expr]) -> bool:
+    return any("overload" in node.id for node in nodes if isinstance(node, ast.Name))
+
+
 class Node:
     url: str
     __slots__ = (
         "end_line",
         "file",
+        "full_name",
         "line",
-        "name",
+        "short_name",
         "source",
         "url",
     )
@@ -43,17 +53,26 @@ class Node:
         file: str | None,
         line: int,
         end_line: int | None,
-        name: str,
+        full_name: str | None = None,  # late init
+        short_name: str,
         source: str,
     ) -> None:
         self.file = file
         self.line = line
         self.end_line = end_line
-        self.name = name
+        self.full_name = full_name
+        self.short_name = short_name
         self.source = source
 
     def __repr__(self) -> str:
-        return f"<Node file={self.file} line={self.line} end_line={self.end_line} name={self.name} url={self.url}>"
+        return (
+            f"<Node file={self.file} "
+            f"line={self.line} "
+            f"end_line={self.end_line} "
+            f"full_path={self.full_name} "
+            f"name={self.short_name} "
+            f"url={self.url}>"
+        )
 
 
 class Index:
@@ -62,6 +81,7 @@ class Index:
         "commit",
         "index_folder",
         "keys",
+        "library",
         "nodes",
         "repo_path",
         "repo_url",
@@ -71,12 +91,14 @@ class Index:
     def __init__(
         self,
         *,
+        library: str,
         repo_path: str,
         index_folder: str,
         repo_url: str,
         branch: str | None = None,
         version: str | None = None,
     ) -> None:
+        self.library: str = library
         self.repo_path: pathlib.Path = pathlib.Path() / repo_path
 
         if index_folder in ("", ".", "./"):
@@ -161,7 +183,7 @@ class Index:
                             file=None,
                             line=body_part.lineno,
                             end_line=body_part.end_lineno,
-                            name=name,
+                            short_name=name,
                             source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                         )
 
@@ -180,7 +202,7 @@ class Index:
                             file=None,
                             line=body_part.lineno,
                             end_line=body_part.end_lineno,
-                            name=name,
+                            short_name=name,
                             source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                         )
             elif isinstance(body_part, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -190,7 +212,7 @@ class Index:
                         file=None,
                         line=body_part.lineno,
                         end_line=body_part.end_lineno,
-                        name=name,
+                        short_name=name,
                         source="\n".join(src[body_part.lineno - 1 : body_part.end_lineno]),
                     )
                 self.index_class_function(nodes, cls, src, body_part)
@@ -209,7 +231,7 @@ class Index:
                     file=None,
                     line=body.lineno,
                     end_line=body.end_lineno,
-                    name=body.name,
+                    short_name=body.name,
                     source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                 )
                 self.index_class(nodes=inner_nodes, src=lines, cls=body)
@@ -220,10 +242,12 @@ class Index:
                         file=None,
                         line=body.lineno,
                         end_line=body.end_lineno,
-                        name=name,
+                        short_name=name,
                         source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                     )
             elif isinstance(body, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if _has_overload(body.decorator_list):
+                    continue
                 name = f"utils.{body.name}" if is_utils else body.name
 
                 if name not in inner_nodes:
@@ -231,14 +255,16 @@ class Index:
                         file=str(fp),
                         line=body.lineno,
                         end_line=body.end_lineno,
-                        name=name,
+                        short_name=name,
                         source="\n".join(lines[body.lineno - 1 : body.end_lineno]),
                     )
 
         path = "/".join(dirs)
         for node in inner_nodes.values():
             node.file = path
+            node.full_name = f"{_transform_path(path)}.{node.short_name}"
 
+        inner_nodes = {node.full_name: node for node in inner_nodes.values()}  # pyright: ignore[reportAssignmentType] # we assert the attribute above
         nodes.update(inner_nodes)
 
     def index_directory(self, nodes: dict[str, Node], idx_path: pathlib.Path, parents: list[str], index_dir: str) -> None:
