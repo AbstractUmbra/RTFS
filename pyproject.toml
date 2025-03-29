@@ -10,19 +10,16 @@ readme = "README.md"
 [dependency-groups]
 dev = ["ruff", "typing-extensions"]
 
-[tool.pdm]
-distribution = false
-
 [tool.pdm.build]
 includes = []
 
 [tool.ruff]
-preview = true
 line-length = 125
 target-version = "py312"
 exclude = ["repos/", ".venv/"]
 
 [tool.ruff.lint]
+preview = true
 select = [
     "A",
     "ANN",
@@ -80,7 +77,6 @@ ignore = [
     "PERF203",
     "PLC0414", # pyright ruling for `as` imports needed
     "Q000",
-    "Q003",
     "RUF001",
     "RUF009",
     "S101",    # assert is used for type checking in this codebase
@@ -121,7 +117,7 @@ mark-parentheses = false
 parametrize-names-type = "csv"
 
 [tool.ruff.lint.flake8-quotes]
-inline-quotes = "single"
+inline-quotes = "double"
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 # https://discuss.python.org/t/problems-with-typeis/55410/6
