@@ -13,7 +13,6 @@ from yarl import URL
 from .fuzzy import extract
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 VERSION_REGEX = re.compile(r"__version__\s*=\s*(?:'|\")((?:\w|\.)*)(?:'|\")")
 
 __all__ = ("Node",)
@@ -283,6 +282,14 @@ class Index:
             elif file.endswith(".py"):
                 self.index_file(nodes, new_path, [*parents, file], is_utils=file in ("utils.py", "utilities.py"))
 
+    def _find_version(self) -> Node | None:
+        for node, value in self.nodes.items():
+            version = node.rsplit(".")[-1]
+            if version == "__version__":
+                return value
+        LOGGER.error("Unable to resolve version for library %r", self.library)
+        return None
+
     def index_lib(self) -> None:
         self.index_directory(self.nodes, self.repo_path, [], self.index_folder)
 
@@ -290,20 +297,14 @@ class Index:
             node.url = f"{self.repo_url}/blob/{self.branch}/{node.file}#L{node.line}-L{node.end_line}"
 
         self.keys = list(self.nodes.keys())
-        version_dunder = self.nodes.get("__version__")
+        version_dunder = self._find_version()
         LOGGER.debug("Version dunder for %r identified as %r.", self.library, version_dunder)
-        # TODO(abstractumbra): the version identifier is broken
 
         if not self.version and version_dunder:
-            version = VERSION_REGEX.search(version_dunder.source)
-            if version:
-                self.version = version.group(1)
-            else:
-                LOGGER.error(
-                    "Unable to ascertain version: %r (%r)",
-                    self.nodes["__version__"],
-                    self.nodes["__version__"].source,
-                )
+            LOGGER.debug("Version source is %r", version_dunder.source)
+            search = VERSION_REGEX.search(version_dunder.source)
+            if search:
+                self.version = search.group(1)
 
     def find_matches(self, word: str) -> list[Node]:
         return [self.nodes[v[0]] for v in extract(word, self.keys, score_cutoff=20, limit=3)]
