@@ -47,7 +47,6 @@ class Indexes:
 
     def get_query(self, lib: str, query: str) -> Response | None:
         if not self._is_indexed:
-            # todo, lock?
             raise RuntimeError("Indexing is not complete.")
 
         if lib not in self.index:

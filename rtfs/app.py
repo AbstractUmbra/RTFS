@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 import pathlib
+import shutil
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -48,6 +49,7 @@ if not REPO_PATH.exists():
     raise RuntimeError("Repo config file does not exist.")
 
 REPO_CONFIG: dict[str, RepoConfig] = json.loads(REPO_PATH.read_text())
+REPO_BASE_PATH = pathlib.Path() / "repos"
 ACCEPTABLE_HOSTS: set[str] = {"github.com", "gitlab.com"}
 
 
@@ -78,7 +80,7 @@ def _reload_indexer(config: dict[str, RepoConfig]) -> Indexes:
     module = importlib.import_module("rtfs.index")
     module = importlib.reload(module)
 
-    return Indexes(REPO_CONFIG)
+    return Indexes(config)
 
 
 def _validate_url(url: str) -> bool:
@@ -162,6 +164,8 @@ def get_rtfs_libraries(rtfs: Indexes) -> Response[Mapping[str, Any]]:
     status_code=202,
 )
 def refresh_indexes(request: Request[str, str, State]) -> Response[RefreshResponse]:
+    shutil.rmtree(REPO_BASE_PATH)
+
     indexer = _reload_indexer(REPO_CONFIG)
 
     success = indexer.reload()
@@ -186,7 +190,7 @@ def refresh_indexes(request: Request[str, str, State]) -> Response[RefreshRespon
     },
     security=[{"apiKey": []}],
 )
-async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: RUF029 # required for callback
+async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs: Indexes) -> Response[dict[str, Any]]:  # noqa: ARG001, RUF029
     if data.name in REPO_CONFIG:
         return Response(content={"error": "Already tracking this repo."}, media_type=MediaType.JSON, status_code=400)
 
@@ -217,8 +221,14 @@ async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs:
     )
 
 
-@get("/debug", dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)}, status_code=200)
-async def debug(rtfs: Indexes, library: str, path: str) -> Response[Mapping[str, Any]]:  # noqa: RUF029 # required for litestar callbacks
+@get(
+    "/debug",
+    middleware=[auth_middleware],
+    dependencies={"rtfs": Provide(current_rtfs, sync_to_thread=False)},
+    security=[{"apiKey": []}],
+    status_code=200,
+)
+async def debug(rtfs: Indexes, library: str) -> Response[Mapping[str, Any]]:  # noqa: RUF029 # required for litestar callbacks
     item = rtfs.index[library].nodes
     resp = {name: repr(value) for name, value in item.items()}
 
@@ -248,7 +258,7 @@ RL_CONFIG = RateLimitConfig(
 
 APP = Litestar(
     debug=False,
-    route_handlers=[get_rtfs, get_rtfs_libraries, refresh_indexes, add_new_index],
+    route_handlers=[get_rtfs, get_rtfs_libraries, refresh_indexes, add_new_index, debug],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
     openapi_config=OpenAPIConfig(

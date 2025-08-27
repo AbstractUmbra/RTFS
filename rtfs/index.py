@@ -291,6 +291,8 @@ class Index:
 
         self.keys = list(self.nodes.keys())
         version_dunder = self.nodes.get("__version__")
+        LOGGER.debug("Version dunder for %r identified as %r.", self.library, version_dunder)
+        # TODO(abstractumbra): the version identifier is broken
 
         if not self.version and version_dunder:
             version = VERSION_REGEX.search(version_dunder.source)
