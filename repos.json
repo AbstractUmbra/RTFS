@@ -2,12 +2,10 @@
     "discord.py": {
         "repo_path": "repos/discord.py",
         "index_folder": "discord",
-        "repo_url": "https://github.com/Rapptz/discord.py"
-    },
-    "discord": {
-        "repo_path": "repos/discord.py",
-        "index_folder": "discord",
-        "repo_url": "https://github.com/Rapptz/discord.py"
+        "repo_url": "https://github.com/Rapptz/discord.py",
+        "aliases": [
+            "discord"
+        ]
     },
     "wavelink": {
         "repo_path": "repos/wavelink",

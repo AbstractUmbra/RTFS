@@ -43,7 +43,15 @@ class Indexes:
         raise ValueError(msg)
 
     def _load_config(self, config: dict[str, RepoConfig], /) -> None:
-        self.__indexable = {k: Index(library=k, **v) for k, v in config.items()}
+        ret: dict[str, Index] = {}
+        for k, v in config.items():
+            aliases = v.pop("aliases", [])
+            index = Index(library=k, **v)  # pyright: ignore[reportCallIssue] # this is popped out above
+            ret[k] = index
+            for alias in aliases:
+                ret[alias] = index
+
+        self.__indexable = ret
 
     def get_query(self, lib: str, query: str, limit: int) -> Response | None:
         if not self._is_indexed:
