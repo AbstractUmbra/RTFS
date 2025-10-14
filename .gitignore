@@ -6,3 +6,4 @@ repos/
 test.py
 secrets/
 compose.override.yaml
+configs/app.json
