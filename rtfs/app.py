@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import pathlib
 import shutil
 from dataclasses import dataclass
@@ -22,7 +21,9 @@ from litestar.openapi.spec import Components, SecurityScheme
 from litestar.response import Redirect
 
 from ._types.results import RefreshResponse, Response as RTFSResponse
+from .config import Config
 from .indexer import Indexes
+from .utils import load_config_type, resolve_docker_config, resolve_docker_secret
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -35,14 +36,9 @@ if TYPE_CHECKING:
 
 __all__ = ("APP",)
 
-API_KEY_FILE = pathlib.Path("/run/secrets/api_key")
-try:
-    _token = API_KEY_FILE.read_text("utf8")
-except FileNotFoundError:
-    _token = os.getenv("API_KEY")
-if not _token:
-    raise RuntimeError("No API token has been provided.")
-API_KEY = _token.rstrip()
+API_KEY = resolve_docker_secret("API_KEY")
+APP_CONFIG_PATH = resolve_docker_config(env_var_name="CONFIG_PATH")
+APP_CONFIG = load_config_type(APP_CONFIG_PATH, type_=Config)
 
 REPO_PATH = pathlib.Path().parent / "repos.json"
 if not REPO_PATH.exists():
@@ -108,6 +104,7 @@ async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
     search: str = "",
     library: str = "",
     direct: bool = False,  # noqa: FBT001, FBT002 # required for litestar callbacks
+    limit: int = 3,
 ) -> Response[Mapping[str, Any]]:
     if not search and not library:
         return Redirect(path="/docs", status_code=status_codes.HTTP_303_SEE_OTHER)
@@ -119,7 +116,7 @@ async def get_rtfs(  # noqa: RUF029 # required in use of litestar callbacks
             status_code=status_codes.HTTP_400_BAD_REQUEST,
         )
 
-    result = rtfs.get_direct(library, search) if direct else rtfs.get_query(library, search)
+    result = rtfs.get_direct(library, search) if direct else rtfs.get_query(library, search, limit=limit)
 
     if result is None:
         return Response(
@@ -229,10 +226,13 @@ async def add_new_index(request: Request[str, str, State], data: NewIndex, rtfs:
     status_code=200,
 )
 async def debug(rtfs: Indexes, library: str) -> Response[Mapping[str, Any]]:  # noqa: RUF029 # required for litestar callbacks
-    item = rtfs.index[library].nodes
+    lib = rtfs.index[library]
+    item = lib.nodes
     resp = {name: repr(value) for name, value in item.items()}
 
-    return Response(content=resp, media_type=MediaType.JSON, status_code=200)
+    ret: dict[str, list[str] | dict[str, str]] = {"keys": lib.keys, "nodes": resp}
+
+    return Response(content=ret, media_type=MediaType.JSON, status_code=200)
 
 
 def get_rtfs_indexes(app: Litestar) -> None:
@@ -257,14 +257,19 @@ RL_CONFIG = RateLimitConfig(
 )
 
 APP = Litestar(
-    debug=False,
+    debug=APP_CONFIG.debug,
     route_handlers=[get_rtfs, get_rtfs_libraries, refresh_indexes, add_new_index, debug],
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
+    response_cache_config=APP_CONFIG.response_cache.to_litestar(),
+    csrf_config=APP_CONFIG.csrf.to_litestar(),
+    cors_config=APP_CONFIG.cors.to_litestar(),
+    allowed_hosts=APP_CONFIG.allowed_hosts.to_litestar(),
+    compression_config=APP_CONFIG.compression.to_litestar(),
     openapi_config=OpenAPIConfig(
         title="RTFS",
         description="A small web api for providing the source code to library methods.",
-        version="0.0.1",
+        version=APP_CONFIG.version,
         components=Components(
             security_schemes={
                 "apiKey": SecurityScheme(

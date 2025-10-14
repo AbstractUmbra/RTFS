@@ -296,7 +296,7 @@ class Index:
         for node in self.nodes.values():
             node.url = f"{self.repo_url}/blob/{self.branch}/{node.file}#L{node.line}-L{node.end_line}"
 
-        self.keys = list(self.nodes.keys())
+        self.keys = [v.short_name for v in self.nodes.values()]
         version_dunder = self._find_version()
         LOGGER.debug("Version dunder for %r identified as %r.", self.library, version_dunder)
 
@@ -306,5 +306,13 @@ class Index:
             if search:
                 self.version = search.group(1)
 
-    def find_matches(self, word: str) -> list[Node]:
-        return [self.nodes[v[0]] for v in extract(word, self.keys, score_cutoff=20, limit=3)]
+    def lookup_by_short_name(self, short_name: str) -> Node:
+        for item in self.nodes.values():
+            if item.short_name == short_name:
+                return item
+
+        msg_ = f"No node with the name {short_name!r} found."
+        raise ValueError(msg_)
+
+    def find_matches(self, word: str, *, limit: int = 3) -> list[Node]:
+        return [self.lookup_by_short_name(v[0]) for v in extract(word, self.keys, score_cutoff=20, limit=limit)]  # pyright: ignore[reportArgumentType] # will exist, minus late init stuff

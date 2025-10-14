@@ -45,7 +45,7 @@ class Indexes:
     def _load_config(self, config: dict[str, RepoConfig], /) -> None:
         self.__indexable = {k: Index(library=k, **v) for k, v in config.items()}
 
-    def get_query(self, lib: str, query: str) -> Response | None:
+    def get_query(self, lib: str, query: str, limit: int) -> Response | None:
         if not self._is_indexed:
             raise RuntimeError("Indexing is not complete.")
 
@@ -53,7 +53,7 @@ class Indexes:
             return None
 
         start = time.monotonic()
-        result = self.index[lib].find_matches(query)
+        result = self.index[lib].find_matches(query, limit=limit)
         end = time.monotonic() - start
         return {
             "results": {x.short_name: {"source": x.source, "url": x.url} for x in result},

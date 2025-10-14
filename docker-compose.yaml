@@ -5,13 +5,25 @@ services:
     restart: "unless-stopped"
     volumes:
       - "./repos.json:/app/repos.json:rw"
+    configs:
+      - app-config
     environment:
+      WEB_PORT: ${WEB_PORT:-8030}
+      CONFIG_PATH: /app-config
       API_KEY_FILE: /run/secrets/api_key
+      CSRF_SECRET_FILE: /run/secrets/csrf_token
     ports:
       - 8030:8030
     secrets:
       - api_key
+      - csrf_token
+
+configs:
+  app-config:
+    file: configs/app.json
 
 secrets:
   api_key:
-    file: ./api_key
+    file: ./secrets/api_key
+  csrf_token:
+    file: ./secrets/csrf

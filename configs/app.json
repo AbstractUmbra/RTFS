@@ -1,0 +1,28 @@
+{
+    "$schema": "./app.schema.json",
+    "debug": true,
+    "version": "1.0.0",
+    "allowed_hosts": {
+        "allowed_hosts": [
+            "rtfs.abstractumbra.dev",
+            "127.0.0.1",
+            "localhost"
+        ]
+    },
+    "compression": {
+        "backend": "brotli"
+    },
+    "cors": {
+        "allow_origins": [
+            "rtfs.abstractumbra.dev",
+            "127.0.0.1",
+            "localhost"
+        ]
+    },
+    "csrf": {
+        "secret": null
+    },
+    "response_cache": {
+        "default_expiration": 60
+    }
+}

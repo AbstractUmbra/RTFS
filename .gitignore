@@ -4,5 +4,5 @@ __pycache__/
 
 repos/
 test.py
-api_key
+secrets/
 compose.override.yaml
