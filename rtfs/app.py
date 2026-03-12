@@ -262,7 +262,6 @@ APP = Litestar(
     on_startup=[get_rtfs_indexes],
     middleware=[RL_CONFIG.middleware],
     response_cache_config=APP_CONFIG.response_cache.to_litestar(),
-    csrf_config=APP_CONFIG.csrf.to_litestar(),
     cors_config=APP_CONFIG.cors.to_litestar(),
     allowed_hosts=APP_CONFIG.allowed_hosts.to_litestar(),
     compression_config=APP_CONFIG.compression.to_litestar(),
