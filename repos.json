@@ -22,10 +22,10 @@
         "index_folder": "hondana",
         "repo_url": "https://github.com/AbstractUmbra/Hondana"
     },
-    "mystbin.py": {
-        "repo_path": "repos/mystbin.py",
-        "index_folder": "mystbin",
-        "repo_url": "https://github.com/PythonistaGuild/mystbin.py"
+    "pastey.py": {
+        "repo_path": "repos/pastey.py",
+        "index_folder": "pastey",
+        "repo_url": "https://github.com/AbstractUmbra/pastey.py"
     },
     "jishaku": {
         "repo_path": "repos/jishaku",
