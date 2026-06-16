@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime
 import importlib
 import json
+import logging
 import pathlib
 import shutil
 from dataclasses import dataclass
@@ -11,6 +13,7 @@ import yarl
 from litestar import Litestar, MediaType, Request, Response, get, post, status_codes
 from litestar.di import Provide
 from litestar.exceptions import NotAuthorizedException
+from litestar.logging import LoggingConfig
 from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
 from litestar.middleware.base import DefineMiddleware
 from litestar.middleware.rate_limit import RateLimitConfig
@@ -45,8 +48,10 @@ if not REPO_PATH.exists():
     raise RuntimeError("Repo config file does not exist.")
 
 REPO_CONFIG: dict[str, RepoConfig] = json.loads(REPO_PATH.read_text())
-REPO_BASE_PATH = pathlib.Path() / "repos"
+REPO_BASE_PATH = pathlib.Path().parent / "repos"
 ACCEPTABLE_HOSTS: set[str] = {"github.com", "gitlab.com"}
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -161,6 +166,7 @@ def get_rtfs_libraries(rtfs: Indexes) -> Response[Mapping[str, Any]]:
     status_code=202,
 )
 def refresh_indexes(request: Request[str, str, State]) -> Response[RefreshResponse]:
+    LOGGER.info("Refresh requested at %s", datetime.datetime.now(datetime.UTC))
     shutil.rmtree(REPO_BASE_PATH)
 
     indexer = _reload_indexer(REPO_CONFIG)
@@ -263,8 +269,14 @@ APP = Litestar(
     middleware=[RL_CONFIG.middleware],
     response_cache_config=APP_CONFIG.response_cache.to_litestar(),
     cors_config=APP_CONFIG.cors.to_litestar(),
-    allowed_hosts=APP_CONFIG.allowed_hosts.to_litestar(),
+    # allowed_hosts=APP_CONFIG.allowed_hosts.to_litestar(),  # noqa: ERA001 # resolve later
     compression_config=APP_CONFIG.compression.to_litestar(),
+    logging_config=LoggingConfig(
+        root={"level": "INFO", "handlers": ["queue_listener"]},
+        formatters={"standard": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"}},
+        log_exceptions="always",
+        disable_stack_trace={404},
+    ),
     openapi_config=OpenAPIConfig(
         title="RTFS",
         description="A small web api for providing the source code to library methods.",
